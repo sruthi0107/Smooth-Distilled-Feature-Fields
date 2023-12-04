@@ -1,5 +1,6 @@
 #include "utils.h"
 #include <thrust/scan.h>
+#include <thrust/execution_policy.h>
 
 
 // for details of the formulae, please see https://arxiv.org/pdf/2206.05085.pdf

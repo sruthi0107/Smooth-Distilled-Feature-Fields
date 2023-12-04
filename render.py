@@ -86,4 +86,4 @@ if __name__ == "__main__":
         w, h = dataset.img_wh
         image = results["rgb"].reshape(h, w, 3)
         image = (image.cpu().numpy() * 255).astype(np.uint8)
-        imageio.imsave(os.path.join("./", f"rendered_{img_idx:03d}.png"), image)  # TODO: cv2
+        imageio.imsave(os.path.join("edit_ops/", f"rendered_{img_idx:03d}.png"), image)  # TODO: cv2

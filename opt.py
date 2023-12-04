@@ -43,7 +43,7 @@ def get_opts():
                         help='number of gpus')
     parser.add_argument('--lr', type=float, default=1e-2,
                         help='learning rate')
-    parser.add_argument("--accumulate_grad_batches", type=int, default=None, help="number of steps of gradient accumulation")
+    parser.add_argument("--accumulate_grad_batches", type=int, default=1, help="number of steps of gradient accumulation")
 
     # experimental training options
     parser.add_argument('--optimize_ext', action='store_true', default=False,
