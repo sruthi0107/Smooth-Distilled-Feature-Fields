@@ -1,0 +1,5 @@
+# Umangi
+
+# python train.py --root_dir /home/jainuma1/PhD/ffd/distilled-feature-fields/sample_dataset --dataset_name colmap --exp_name exp_baseline --downsample 0.25 --num_epochs 4 --batch_size 32 --scale 4.0 --ray_sampling_strategy same_image --feature_dim 512 --random_bg --feature_directory /home/jainuma1/PhD/ffd/distilled-feature-fields/sample_dataset/rgb_feature_langseg
+# python render.py --root_dir /home/jainuma1/PhD/ffd/distilled-feature-fields/sample_dataset --dataset_name colmap --downsample 0.25 --scale 4.0 --ray_sampling_strategy same_image --feature_dim 512 --ckpt_path ckpts/colmap/exp_baseline/epoch\=3_slim.ckpt --edit_config query.yaml
+# cd edit_ops/ && ffmpeg -framerate 30 -i ./rendered_%03d.png -vcodec libx264 -pix_fmt yuv420p -r 30 video.mp4 && cd ..
