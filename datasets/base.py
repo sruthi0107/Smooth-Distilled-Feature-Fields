@@ -12,7 +12,7 @@ class BaseDataset(Dataset):
         self.split = split
         self.downsample = downsample
         self.len_per_epoch = len_per_epoch
-        self.patch_size = None  # 128
+        self.patch_size = 64  # oom at 128
         self.patch_coverage = 0.9
 
     def read_intrinsics(self):
@@ -24,7 +24,7 @@ class BaseDataset(Dataset):
         return len(self.poses)
 
     def sample_patch(self, h, w):
-        skip = int((min(h, w) * self.patch_coverage) / self.patch_size)
+        skip = 1 #int((min(h, w) * self.patch_coverage) / self.patch_size)
         patch_w_skip = self.patch_size * skip
         patch_h_skip = self.patch_size * skip
 
@@ -34,6 +34,7 @@ class BaseDataset(Dataset):
         top_to_bottom = torch.arange(top, top + patch_h_skip, skip)
 
         index_hw = (top_to_bottom * w)[:, None] + left_to_right[None, :]
+        # 128, 128 is the patch, patch_h_skip, patch_w_skip are skip
         return index_hw.reshape(-1)
 
     def __getitem__(self, idx):
@@ -67,6 +68,10 @@ class BaseDataset(Dataset):
                         feats = torch.nn.functional.grid_sample(feature_map, sampler, mode='bilinear', align_corners=True)  # 1c1N
                         feats = feats[0, :, 0].T  # 1c1N->cN->Nc
                     sample['feature'] = feats
+                    # print("feature_map", feature_map.shape) # 1, 512, 360, 480
+                    # print("feats", feats.shape) # 32, 512
+                    # print("u", u.shape) # 32
+                    # print("pix_idxs", pix_idxs.shape, pix_idxs)
 
             if self.rays.shape[-1] == 4: # HDR-NeRF data
                 sample['exposure'] = rays[:, 3:]

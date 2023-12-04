@@ -178,6 +178,7 @@ class ColmapDataset(BaseDataset):
             self.rays += [torch.cat(buf, 1)]
 
             if feature_paths:
+                # Extracted features of shape [512, 360, 480]
                 self.features.append(torch.load(feature_paths[i]))
 
         self.rays = torch.stack(self.rays) # (N_images, hw, ?)

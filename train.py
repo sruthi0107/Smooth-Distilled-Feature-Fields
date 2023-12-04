@@ -33,6 +33,8 @@ from torchmetrics import (
 )
 from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
 import torch.nn.functional as F
+from sklearn.decomposition import PCA
+from pypher.pypher import psf2otf
 
 # pytorch-lightning
 from pytorch_lightning.strategies import DDPStrategy
@@ -49,6 +51,23 @@ import clip
 import yaml
 from clip_utils import CLIPEditor
 
+PATCH_EMB = 64
+
+def grad_fn(x, dxyFT):
+    # Apply Fourier domain filters to compute gradients
+    grad_x = torch.real(torch.fft.ifft2(torch.fft.fft2(x) * dxyFT[0]))
+    grad_y = torch.real(torch.fft.ifft2(torch.fft.fft2(x) * dxyFT[1]))
+    return grad_x, grad_y
+
+def pca_do(images, embedding_size=3):
+    n, bs, es = images.shape
+    compressed = images.view(-1, es)
+    compressed = compressed.detach().cpu()
+    pca = PCA(n_components=embedding_size)
+    pca.fit(compressed)
+    pca_features = pca.transform(compressed)
+    images_vis = pca_features.reshape(n, PATCH_EMB, PATCH_EMB, embedding_size)
+    return images_vis
 
 def depth2img(depth):
     depth = (depth-depth.min())/(depth.max()-depth.min())
@@ -94,6 +113,12 @@ class NeRFSystem(LightningModule):
         self.val_lpips_metric = []
         self.val_feat_mse_metric = []
         self.val_feat_cos_metric = []
+
+        dx = np.array([[-1., 1.]])
+        dy = np.array([[-1.], [1.]])
+        dxFT = torch.from_numpy(psf2otf(dx, (PATCH_EMB, PATCH_EMB)))
+        dyFT = torch.from_numpy(psf2otf(dy, (PATCH_EMB, PATCH_EMB)))
+        self.dxyFT = torch.stack((dxFT, dyFT), axis=0).to("cuda")
         """
         if hparams.edit_config is not None:
             with open(hparams.edit_config, 'r') as f:
@@ -182,6 +207,9 @@ class NeRFSystem(LightningModule):
 
     def forward(self, batch, split, detach_geometry=False):
         if split=='train':
+            # self.poses is 49, 3, 4. self.directions is h*w, 3
+            # batch['pix_idxs'].shape is batch_size
+            # batch['img_idxs'].shape is a number
             poses = self.poses[batch['img_idxs']]
             directions = self.directions[batch['pix_idxs']]
         else:
@@ -192,7 +220,7 @@ class NeRFSystem(LightningModule):
             dR = axisangle_to_R(self.dR[batch['img_idxs']])
             poses[..., :3] = dR @ poses[..., :3]
             poses[..., 3] += self.dT[batch['img_idxs']]
-
+        # rays_o and rays_d and directions are batch_size, 3. Poses is 3,4
         rays_o, rays_d = get_rays(directions, poses)
 
         kwargs = {'test_time': split!='train',
@@ -294,8 +322,25 @@ class NeRFSystem(LightningModule):
 
         # feature loss
         if 'feature' in results and self.hparams.clipnerf_text is None:
+            # batch_size, feature_size
+            # random_number = np.random.rand()
+            # if random_number < 0.05:
+            #     save_pca_feature = False
+            #     pca_result_features = pca_do(torch.stack([results['feature'], batch['feature']], dim=0))
+            #     pca_result_features = (pca_result_features - pca_result_features.min()) / (pca_result_features.max() - pca_result_features.min())
+            #     pca_result_features = (pca_result_features*255).astype(np.uint8)
+            #     resf, batf = pca_result_features[0], pca_result_features[1]
+            #     imageio.imsave('rendered_feat_train_{}.png'.format(random_number), resf)
+            #     imageio.imsave('true_feat_train_{}.png'.format(random_number), batf)
+                # breakpoint()
+
             loss_d['feature'] = ((results['feature'] - batch['feature']) ** 2).sum(-1).mean() * 1e-2
             self.log('train/loss_f', loss_d['feature'])
+            tv_loss = 0
+            for feature_channel in range(results['feature'].shape[-1]):
+                grad_x, grad_y = grad_fn(results['feature'][:, feature_channel].reshape(PATCH_EMB, PATCH_EMB), self.dxyFT)
+                tv_loss += (torch.abs(grad_x) + torch.abs(grad_y)).mean()  * 1e-4
+            loss_d['feature_tv'] = tv_loss/results['feature'].shape[-1]
 
         if self.hparams.use_exposure:
             zero_radiance = torch.zeros(1, 3, device=self.device)
@@ -424,7 +469,7 @@ if __name__ == '__main__':
                                default_hp_metric=False)
 
     trainer = Trainer(max_epochs=hparams.num_epochs,
-                      check_val_every_n_epoch=hparams.num_epochs,
+                      check_val_every_n_epoch=1,
                       callbacks=callbacks,
                       logger=logger,
                       # log_every_n_steps=5,

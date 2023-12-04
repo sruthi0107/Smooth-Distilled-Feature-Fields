@@ -142,6 +142,7 @@ def __render_rays_test(model, rays_o, rays_d, hits_t, **kwargs):
     if kwargs.get('render_feature', False):
         with torch.no_grad():
             surfaces = rays_o + rays_d * results['depth'].detach()[..., None]
+            # this is of shape h*w, emnedding_dim
             results['feature'] = model.encode_feature(surfaces)
 
     if exp_step_factor==0: # synthetic
