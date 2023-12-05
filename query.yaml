@@ -1,13 +1,28 @@
+# query:
+#   query_type: "text"
+#   # texts: ["light", "chair", "television", "floor"]
+#   texts: ["flower"]
+#   positive_ids: [0] # indices of target texts
+#   score_threshold: # empty means None. use argmax.
+
+# edit:
+#   operations:
+#     - edit_type: "extraction"
+#     # - edit_type: "deletion"
+#     #- edit_type: "color_func"
+#     #  func_str: "lambda c: c[..., [2,1,0]]"  # rgb -> bgr
+#     # texts: ["apple", "banana", "vegetables", "floor"]
+
 query:
   query_type: "text"
-  texts: [ "apple", "banana", "vegetables", "floor"]
-  positive_ids: [0] # indices of target texts
+  texts: ["apple", "banana", "vegetables", "floor"]
+  positive_ids: [2] # indices of target texts
   score_threshold: # empty means None. use argmax.
 
 edit:
   operations:
-    - edit_type: "extraction"
-    # - edit_type: "deletion"
-    #- edit_type: "color_func"
+    # - edit_type: "extraction"
+    - edit_type: "deletion"
+    # - edit_type: "color_func"
     #  func_str: "lambda c: c[..., [2,1,0]]"  # rgb -> bgr
     # texts: ["apple", "banana", "vegetables", "floor"]

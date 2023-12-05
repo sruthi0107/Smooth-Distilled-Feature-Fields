@@ -1,6 +1,53 @@
 # Umangi
 
-# python train.py --root_dir /home/jainuma1/PhD/ffd/distilled-feature-fields/sample_dataset --dataset_name colmap --exp_name exp_baseline --downsample 0.25 --num_epochs 4 --batch_size 32 --scale 4.0 --ray_sampling_strategy same_image --feature_dim 512 --random_bg --feature_directory /home/jainuma1/PhD/ffd/distilled-feature-fields/sample_dataset/rgb_feature_langseg
+python train.py --root_dir /home/jainuma1/PhD/ffd/distilled-feature-fields/sample_dataset --dataset_name colmap --exp_name exp_baseline --downsample 0.25 --num_epochs 4 --batch_size 32 --scale 4.0 --ray_sampling_strategy same_image --feature_dim 512 --random_bg --feature_directory /home/jainuma1/PhD/ffd/distilled-feature-fields/sample_dataset/rgb_feature_langseg
 # python render.py --root_dir /home/jainuma1/PhD/ffd/distilled-feature-fields/sample_dataset --dataset_name colmap --downsample 0.25 --scale 4.0 --ray_sampling_strategy same_image --feature_dim 512 --ckpt_path ckpts/colmap/exp_baseline/epoch\=3_slim.ckpt --edit_config query.yaml
 # cd edit_ops/ && ffmpeg -framerate 30 -i ./rendered_%03d.png -vcodec libx264 -pix_fmt yuv420p -r 30 video_tv.mp4 && cd ..
 # tensorboard --logdir=./
+
+sigmas_temp = sigmas.reshape(360, 480, 4)
+sigmas_temp = (sigmas_temp-torch.min(sigmas_temp))/(torch.max(sigmas_temp)-torch.min(sigmas_temp))
+import imageio
+import numpy as np
+sigmas_temp = sigmas_temp.cpu().numpy().astype(np.uint8)
+imageio.imsave('sigmas_all_extract.png', sigmas_temp)
+
+sorted_scores, _ = torch.sort(scores)
+unique_sorted_tensor = torch.unique(sorted_scores)
+unique_sorted_tensor
+
+tensor([0.4922, 0.4924, 0.4927, 0.4929, 0.4932, 0.4934, 0.4937, 0.4941, 0.4961,
+        0.4973,    nan], device='cuda:0', dtype=torch.float16)
+
+
+python -u encode_images.py --backbone clip_vitl16_384 --weights /home/jainuma1/PhD/ffd/attempt_clean/distilled-feature-fields/encoders/lseg_encoder/demo_e200.ckpt --widehead --no-scaleinv --outdir /home/jainuma1/PhD/nerf_datasets/flower/rgb_feature_langseg --test-rgb-dir /home/jainuma1/PhD/nerf_datasets/flower/images_og
+
+python train.py --root_dir /home/jainuma1/PhD/ffd/distilled-feature-fields/sample_dataset --dataset_name colmap --exp_name exp_baseline --downsample 0.25 --num_epochs 4 --batch_size 32 --scale 4.0 --ray_sampling_strategy same_image --feature_dim 512 --random_bg --feature_directory /home/jainuma1/PhD/ffd/distilled-feature-fields/sample_dataset/rgb_feature_langseg --sam_directory /home/jainuma1/PhD/ffd/distilled-feature-fields/sample_dataset/sam
+
+python render.py --root_dir /home/jainuma1/PhD/ffd/distilled-feature-fields/sample_dataset --dataset_name colmap --downsample 0.25 --scale 4.0 --ray_sampling_strategy same_image --feature_dim 512 --ckpt_path ckpts/colmap/exp_baseline/epoch\=3_slim.ckpt --edit_config query.yaml --sam_directory /home/jainuma1/PhD/ffd/distilled-feature-fields/sample_dataset/sam
+
+
+python train.py --root_dir /home/jainuma1/PhD/nerf_datasets/room --dataset_name colmap --exp_name flower --downsample 0.25 --num_epochs 4 --batch_size 4096 --scale 4.0 --ray_sampling_strategy same_image --feature_dim 512 --random_bg --feature_directory /home/jainuma1/PhD/nerf_datasets/room/rgb_feature_langseg 
+
+
+colmap feature_extractor --ImageReader.camera_model OPENCV --SiftExtraction.estimate_affine_shape=true --SiftExtraction.domain_size_pooling=true --ImageReader.single_camera 1 --database_path /home/jainuma1/PhD/nerf_datasets/room/database.db --image_path /home/jainuma1/PhD/nerf_datasets/room/images --SiftExtraction.use_gpu=false
+colmap exhaustive_matcher --SiftMatching.guided_matching=true --database_path /home/jainuma1/PhD/nerf_datasets/room_again/database.db --SiftMatching.use_gpu=false
+
+mkdir /home/jainuma1/PhD/nerf_datasets/room_again/sparse
+
+colmap mapper --database_path /home/jainuma1/PhD/nerf_datasets/room_again/database.db --image_path /home/jainuma1/PhD/nerf_datasets/room_again/images --output_path /home/jainuma1/PhD/nerf_datasets/room_again/sparse
+colmap bundle_adjuster --input_path /home/jainuma1/PhD/nerf_datasets/room_again/sparse/0 --output_path /home/jainuma1/PhD/nerf_datasets/room_again/sparse/0 --BundleAdjustment.refine_principal_point 1
+colmap image_undistorter --image_path /home/jainuma1/PhD/nerf_datasets/room_again/images --input_path /home/jainuma1/PhD/nerf_datasets/room_again/sparse/0 --output_path /home/jainuma1/PhD/nerf_datasets/room_again_undis --output_type COLMAP
+
+check_image = batch['sam_masks'][0]["segmentation"].reshape(64, 64)
+import matplotlib.pyplot as plt
+plt.imshow(check_image.cpu().numpy())
+plt.savefig('check_sam_crop.png')
+sds = pca_do(batch['feature'].unsqueeze(0))
+plt.imshow(sds[0])
+plt.savefig('feat_crop_corresponding.png')
+plt.imshow(batch['rgb'].cpu().numpy().reshape(64, 64, 3))
+plt.savefig('check_fig_crop.png')
+
+# for vegetables
+python train.py --root_dir /home/jainuma1/PhD/ffd/distilled-feature-fields/sample_dataset --dataset_name colmap --exp_name exp_baseline --downsample 0.25 --num_epochs 4 --batch_size 4096 --scale 4.0 --ray_sampling_strategy same_image --feature_dim 512 --random_bg --feature_directory /home/jainuma1/PhD/ffd/distilled-feature-fields/sample_dataset/rgb_feature_langseg --sam_directory /home/jainuma1/PhD/ffd/distilled-feature-fields/sam

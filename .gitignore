@@ -3,8 +3,10 @@
 ckpts/
 logs/
 # results/
-# *.mp4
+*.mp4
 *.png
+query.yaml
+sam/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -135,3 +137,6 @@ MANIFEST
 
 # # Pyre type checker
 # .pyre/
+scores_apple_nomask
+sigmas_all_extract
+encoders/lseg_encoder/log_test_default_ignore.txt

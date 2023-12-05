@@ -38,7 +38,7 @@ class FolderLoader(enc_ds.ADE20KSegmentation):#(torch.utils.data.Dataset):
 
 def get_folder_images(img_folder):
     img_paths = []
-    glist = list(glob.glob(img_folder.rstrip("/") + '/*.png')) + list(glob.glob(img_folder.rstrip("/") + '/*.jpg'))
+    glist = list(glob.glob(img_folder.rstrip("/") + '/*.png')) + list(glob.glob(img_folder.rstrip("/") + '/*.jpg')) + list(glob.glob(img_folder.rstrip("/") + '/*.JPG'))
     return list(sorted(glist))
 
 

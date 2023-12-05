@@ -71,6 +71,7 @@ def get_opts():
 
     parser.add_argument('--feature_directory', type=str, default=None)
     parser.add_argument('--feature_dim', type=int, default=None)
+    parser.add_argument('--sam_directory', type=str, default=None)
 
     parser.add_argument('--edit_config', type=str, default=None)
 

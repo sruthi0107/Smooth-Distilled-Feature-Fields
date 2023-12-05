@@ -1,7 +1,7 @@
 from torch.utils.data import Dataset
 import numpy as np
 import torch
-
+import matplotlib.pyplot as plt
 
 class BaseDataset(Dataset):
     """
@@ -24,7 +24,7 @@ class BaseDataset(Dataset):
         return len(self.poses)
 
     def sample_patch(self, h, w):
-        skip = 1 #int((min(h, w) * self.patch_coverage) / self.patch_size)
+        skip = int((min(h, w) * self.patch_coverage) / self.patch_size)
         patch_w_skip = self.patch_size * skip
         patch_h_skip = self.patch_size * skip
 
@@ -72,6 +72,35 @@ class BaseDataset(Dataset):
                     # print("feats", feats.shape) # 32, 512
                     # print("u", u.shape) # 32
                     # print("pix_idxs", pix_idxs.shape, pix_idxs)
+                    # print('feat path', self.features[img_idxs])
+            if hasattr(self, 'sam_masks') and len(self.sam_masks):
+                sam_crops = self.sam_masks[img_idxs]
+                # print('sam path', sam_crops)
+                u = (pix_idxs % self.img_wh[0] / self.img_wh[0]) * 2 - 1
+                v = (pix_idxs // self.img_wh[0] / self.img_wh[1]) * 2 - 1
+                with torch.no_grad():
+                    sampler = torch.tensor(np.stack([u, v], axis=-1)[None, None]).float()  # N2->11N2
+                    for sam_length in range(len(self.sam_masks[img_idxs])):
+                        try:
+                            if isinstance(self.sam_masks[img_idxs][sam_length]["segmentation"], np.ndarray):
+                                seg = torch.from_numpy(self.sam_masks[img_idxs][sam_length]["segmentation"]).unsqueeze(0).unsqueeze(0).float()
+                            else:
+                                seg = self.sam_masks[img_idxs][sam_length]["segmentation"].unsqueeze(0).unsqueeze(0).float()
+                            # breakpoint()
+                            
+                            sam_crops[sam_length]["segmentation"] = torch.nn.functional.grid_sample(seg, sampler, mode='bilinear', align_corners=True)  # 1c1N
+                            sam_crops[sam_length]["use"] = True
+                        except:
+                            sam_crops[sam_length]["use"] = False
+                            # print('sam error', seg.shape, sampler.shape, len(sam_crops))
+                        # sam_crops[sam_length]["segmentation"] = sam_crops[sam_length]["segmentation"]
+                        # print("sam_crops", sam_crops[sam_length]["segmentation"].shape) # 32, 512
+                sample['sam_masks'] = sam_crops
+                check_image = sample['sam_masks'][0]["segmentation"].reshape(64, 64)
+                # plt.imshow(check_image)
+                # plt.savefig('check_sam_crop.png')
+                # plt.imshow(sample['rgb'].cpu().numpy().reshape(64, 64, 3))
+                # plt.savefig('check_fig_crop.png')
 
             if self.rays.shape[-1] == 4: # HDR-NeRF data
                 sample['exposure'] = rays[:, 3:]
@@ -82,5 +111,10 @@ class BaseDataset(Dataset):
                 sample['rgb'] = rays[:, :3]
                 if rays.shape[1] == 4: # HDR-NeRF data
                     sample['exposure'] = rays[0, 3] # same exposure for all rays
+            if hasattr(self, 'features') and len(self.features):
 
+                feature_map = self.features[idx].float()  # chw->1chw   
+                ch, h, w = feature_map.shape 
+                sample['feature'] = feature_map.permute(1, 2, 0).reshape(-1, ch)
+            # print(sample.keys(), hasattr(self, 'features'), len(self.features))
         return sample

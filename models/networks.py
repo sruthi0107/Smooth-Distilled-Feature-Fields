@@ -5,6 +5,7 @@ import vren
 from einops import rearrange
 from .custom_functions import TruncExp
 import numpy as np
+from sklearn.decomposition import PCA
 
 from .rendering import NEAR_DISTANCE
 
@@ -17,7 +18,6 @@ class NGP(nn.Module):
         self.feature_out_dim = feature_out_dim
         self.query_features = None
         self.positive_ids = [0]
-        self.score_threshold = None
 
         # scene bounding box
         self.scale = scale
@@ -414,14 +414,41 @@ class NGP(nn.Module):
         if query_features is None:
             query_features = self.query_features
         query_features /= query_features.norm(dim=-1, keepdim=True)
-        scores = features.half() @ query_features.T.half()  # (N_points, n_texts)
+        scores = features.half() @ query_features.T.half()  # (N_points, n_texts) # 
+        # features_r = features.reshape(-1, 512)
+        # features_r = features_r.cpu().numpy()
+        # features_r = np.nan_to_num(features_r)
+        # pca = PCA(n_components=3)
+        # pca.fit(features_r)
+        # PCA(n_components=3)
+        # fes = pca.transform(features_r)
+        # fes = fes.reshape(360, 480, 4, 3)
+        # feso = fes[:, :, 0, 3]
+        # feso = fes[:, :, 0, :]
+        # feso = (feso - np.min(feso))/(np.max(feso)-np.min(feso))
+        # feso = (feso * 255).astype(np.uint8)
+        # imageio.imsave('features_nomask.png', feso)
+
+        # scores_apple = scores[:, 0]
+        # scores_apple = _scores.reshape(360, 480, 4)
+        # scores_apple = scores_apple[:, :, 0]
+        # scores_apple = scores_apple.cpu().numpy()
+        # scores_apple = np.nan_to_num(scores_apple)
+        # scores_apple = (scores_apple - np.min(scores_apple))/(np.max(scores_apple)-np.min(scores_apple))
+        # scores_apple = (scores_apple * 255).astype(np.uint8)
+        # imageio.imsave('scores_apple_aftersam.png', scores_apple)
+
         if scores.shape[-1] == 1:
             score_threshold = self.score_threshold if self.score_threshold is not None else 0.4
             scores = scores[:, 0]  # (N_points,)
             scores = (scores >= score_threshold).float()
         else:
             scores = torch.nn.functional.softmax(scores, dim=-1)  # (N_points, n_texts)
+            # if False: #self.score_threshold is not None:
             if self.score_threshold is not None:
+                # if sam_features is not None:
+                    # breakpoint()
+                self.score_threshold = 0.25
                 scores = scores[:, self.positive_ids].sum(-1)  # (N_points, )
                 scores = (scores >= self.score_threshold).float()
             else:

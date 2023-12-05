@@ -22,7 +22,8 @@ class ColmapDataset(BaseDataset):
             self.sparse_dir = "sparse"
         else:
             raise NotImplementedError
-
+        # self.features = []
+        # self.sam_masks = []
         self.read_intrinsics()
 
         if kwargs.get('read_meta', True):
@@ -55,6 +56,7 @@ class ColmapDataset(BaseDataset):
         # Step 2: correct poses
         # read extrinsics (of successfully reconstructed images)
         imdata = read_images_binary(os.path.join(self.root_dir, self.sparse_dir, 'images.bin'))
+        # img_names = [imdata[k].name.replace('JPG', 'png') for k in imdata]
         img_names = [imdata[k].name for k in imdata]
         perm = np.argsort(img_names)
         if '360_v2' in self.root_dir and self.downsample<1: # mipnerf360 data
@@ -69,6 +71,12 @@ class ColmapDataset(BaseDataset):
         else:
             feature_folder = None
             feature_paths = []
+        if kwargs.get('load_sam', False):
+            sam_folder = kwargs.get('sam_directory', os.path.join(self.root_dir, 'sam'))
+            sam_paths = [os.path.join(sam_folder, os.path.splitext(name)[0] + '_sam.pth') for name in sorted(img_names)]
+        else:
+            sam_folder = None
+            sam_paths = []
         # read successfully reconstructed images and ignore others
         img_paths = [os.path.join(self.root_dir, folder, name)
                      for name in sorted(img_names)]
@@ -85,6 +93,7 @@ class ColmapDataset(BaseDataset):
         pts3d = np.array([pts3d[k].xyz for k in pts3d]) # (N, 3)
 
         self.poses, self.pts3d = center_poses(poses, pts3d)
+        # breakpoint() # num images. 3. 4
 
         scale = np.linalg.norm(self.poses[..., 3], axis=-1).min()
         self.poses[..., 3] /= scale
@@ -117,19 +126,20 @@ class ColmapDataset(BaseDataset):
             else: # real
                 self.unit_exposure_rgb = 0.5
                 # even numbers are train, odd numbers are test
+                image_extension = 'png'
                 if split=='train':
                     img_paths = sorted(glob.glob(os.path.join(self.root_dir,
-                                                    f'input_images/*0.jpg')))[::2]
+                                                    f'input_images/*0.' + image_extension)))[::2]
                     img_paths+= sorted(glob.glob(os.path.join(self.root_dir,
-                                                    f'input_images/*2.jpg')))[::2]
+                                                    f'input_images/*2.' + image_extension)))[::2]
                     img_paths+= sorted(glob.glob(os.path.join(self.root_dir,
-                                                    f'input_images/*4.jpg')))[::2]
+                                                    f'input_images/*4.' + image_extension)))[::2]
                     self.poses = np.tile(self.poses[::2], (3, 1, 1))
                 elif split=='test':
                     img_paths = sorted(glob.glob(os.path.join(self.root_dir,
-                                                    f'input_images/*1.jpg')))[1::2]
+                                                    f'input_images/*1.' + image_extension)))[1::2]
                     img_paths+= sorted(glob.glob(os.path.join(self.root_dir,
-                                                    f'input_images/*3.jpg')))[1::2]
+                                                    f'input_images/*3.' + image_extension)))[1::2]
                     self.poses = np.tile(self.poses[1::2], (2, 1, 1))
                 else:
                     raise ValueError(f"split {split} is invalid for HDR-NeRF!")
@@ -138,14 +148,17 @@ class ColmapDataset(BaseDataset):
             if split=='train':
                 img_paths = [x for i, x in enumerate(img_paths) if i%8!=0]
                 feature_paths = [x for i, x in enumerate(feature_paths) if i%8!=0]
+                sam_paths = [x for i, x in enumerate(sam_paths) if i%8!=0]
                 self.poses = np.array([x for i, x in enumerate(self.poses) if i%8!=0])
             elif split=='test':
                 img_paths = [x for i, x in enumerate(img_paths) if i%8==0]
                 feature_paths = [x for i, x in enumerate(feature_paths) if i%8==0]
+                # sam_paths = [x for i, x in enumerate(sam_paths) if i%8==0]
                 self.poses = np.array([x for i, x in enumerate(self.poses) if i%8==0])
 
         print(f'Loading {len(img_paths)} {split} images ...')
         self.features = []
+        self.sam_masks = []
         for i, img_path in enumerate(tqdm(img_paths)):
             buf = [] # buffer for ray attributes: rgb, etc
 
@@ -180,6 +193,10 @@ class ColmapDataset(BaseDataset):
             if feature_paths:
                 # Extracted features of shape [512, 360, 480]
                 self.features.append(torch.load(feature_paths[i]))
+
+            if sam_paths:
+                self.sam_masks.append(torch.load(sam_paths[i]))
+
 
         self.rays = torch.stack(self.rays) # (N_images, hw, ?)
         self.poses = torch.FloatTensor(self.poses) # (N_images, 3, 4)

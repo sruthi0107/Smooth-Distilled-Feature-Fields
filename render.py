@@ -73,6 +73,8 @@ if __name__ == "__main__":
         # split="test",
         split="test_traj_fixed",
         downsample=hparams.downsample,
+        # load_sam=hparams.sam_directory is not None,
+        # sam_directory=hparams.sam_directory,
     )
 
     # start

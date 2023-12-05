@@ -50,8 +50,11 @@ import warnings; warnings.filterwarnings("ignore")
 import clip
 import yaml
 from clip_utils import CLIPEditor
+import torch
+import torchvision.transforms as T
 
 PATCH_EMB = 64
+gblur = T.functional.gaussian_blur
 
 def grad_fn(x, dxyFT):
     # Apply Fourier domain filters to compute gradients
@@ -61,7 +64,7 @@ def grad_fn(x, dxyFT):
 
 def pca_do(images, embedding_size=3):
     n, bs, es = images.shape
-    compressed = images.view(-1, es)
+    compressed = images.reshape(n*bs, es)
     compressed = compressed.detach().cpu()
     pca = PCA(n_components=embedding_size)
     pca.fit(compressed)
@@ -97,6 +100,8 @@ class NeRFSystem(LightningModule):
         rgb_act = 'None' if self.hparams.use_exposure else 'Sigmoid'
         if hparams.feature_directory is not None:
             assert hparams.feature_dim is not None, "set feature_dim for using feature field"
+        if hparams.sam_directory is not None:
+            assert hparams.feature_dim is not None, "set sam_dim for using smooth field"
         self.model = NGP(scale=self.hparams.scale, rgb_act=rgb_act,
                          feature_out_dim=hparams.feature_dim)
         G = self.model.grid_size
@@ -244,13 +249,18 @@ class NeRFSystem(LightningModule):
         self.train_dataset = dataset(split=self.hparams.split,
                                      load_features=hparams.feature_directory is not None,
                                      feature_directory=hparams.feature_directory,
+                                     load_sam=hparams.sam_directory is not None,
+                                     sam_directory=hparams.sam_directory,
                                      **kwargs)
         self.train_dataset.batch_size = self.hparams.batch_size
         self.train_dataset.ray_sampling_strategy = self.hparams.ray_sampling_strategy
         if self.hparams.clipnerf_text is not None:
             self.train_dataset.patch_size = self.hparams.clipnerf_patch_size
 
-        self.test_dataset = dataset(split='test', **kwargs)
+        self.test_dataset = dataset(split='test', 
+                                    load_features=hparams.feature_directory is not None,
+                                    feature_directory=hparams.feature_directory,
+                                    **kwargs)
 
     def configure_optimizers(self):
         # define additional parameters
@@ -334,12 +344,49 @@ class NeRFSystem(LightningModule):
             #     imageio.imsave('true_feat_train_{}.png'.format(random_number), batf)
                 # breakpoint()
 
+            # if 'sam_masks' in batch:
+            #     sam_masks = batch['sam_masks']
+            #     feats = results['feature'].reshape(PATCH_EMB, PATCH_EMB, -1)
+            #     for sam_mask in range(len(sam_masks)):
+            #         if sam_masks[sam_mask]["use"] and sam_masks[sam_mask]["area"] > 500:
+            #         # if sam_masks[sam_mask]["area"] > 500:
+            #         #     try:
+            #             random_number = np.random.rand()
+            #             seg = sam_masks[sam_mask]["segmentation"].reshape(PATCH_EMB, PATCH_EMB)#.unsqueeze(-1)
+            #             masks_feats = torch.zeros_like(feats)
+            #             for i in range(feats.shape[-1]):
+            #                 masks_feats[:, :, i] = seg
+            #             temp = feats * masks_feats
+            #             # breakpoint()
+            #             # feats = gblur(temp.permute(2, 0, 1), 3).permute(1, 2, 0)
+            #             feats = torch.where(masks_feats == 0, feats, gblur(temp.permute(2, 0, 1), 3).permute(1, 2, 0))
+
+            #             # breakpoint()
+            #             if random_number < 0.0005:
+            #                 import matplotlib.pyplot as plt
+            #                 sds = pca_do(feats.reshape(1, -1, 512))
+            #                 plt.imshow(sds[0])
+            #                 plt.savefig('blur_feat_before.png')
+            #                 sds = pca_do(feats.reshape(1, -1, 512))
+            #                 plt.imshow(sds[0])
+            #                 plt.savefig('blur_feat_after.png')
+            #                 plt.imshow(seg.cpu().numpy())
+            #                 plt.savefig('blur_seg.png')
+            #                 sds = pca_do(temp.reshape(1, -1, 512))
+            #                 # breakpoint()
+
+            #         # except:
+            #         #     print(seg.shape, 'seg shape')
+            # # breakpoint()
+            # # results['feature'] = feats.reshape(PATCH_EMB*PATCH_EMB, -1)
+            #     results['feature'] = feats.reshape(PATCH_EMB*PATCH_EMB, -1)
             loss_d['feature'] = ((results['feature'] - batch['feature']) ** 2).sum(-1).mean() * 1e-2
+            
             self.log('train/loss_f', loss_d['feature'])
             tv_loss = 0
             for feature_channel in range(results['feature'].shape[-1]):
                 grad_x, grad_y = grad_fn(results['feature'][:, feature_channel].reshape(PATCH_EMB, PATCH_EMB), self.dxyFT)
-                tv_loss += (torch.abs(grad_x) + torch.abs(grad_y)).mean()  * 1e-4
+                tv_loss += (torch.abs(grad_x) + torch.abs(grad_y)).mean()  * 0
             loss_d['feature_tv'] = tv_loss/results['feature'].shape[-1]
 
         if self.hparams.use_exposure:
@@ -395,6 +442,32 @@ class NeRFSystem(LightningModule):
 
         self.val_psnr_metric.append(logs['psnr'].cpu().numpy())
         self.val_ssim_metric.append(logs['ssim'].cpu().numpy())
+        if 'feature' in results:
+            pred_features = results['feature'].reshape(-1, 512)
+            # breakpoint()
+            lseg_features = batch['feature'].reshape(-1, 512)
+
+            # Assuming pred_features and lseg_features are numpy arrays of shape (N, 512)
+
+            # Normalize the feature vectors
+            pred_features_norm = F.normalize(pred_features, dim=1)
+            lseg_features_norm = F.normalize(lseg_features, dim=1)
+
+            # Calculate cosine similarity
+            cosine_similarity = torch.nn.functional.cosine_similarity(pred_features_norm, lseg_features_norm, dim=1)
+
+            # Calculate mean squared error (MSE) loss
+            mse_loss = F.mse_loss(pred_features, lseg_features)
+            
+            logs['mse_feat'] = mse_loss
+            self.val_feat_mse_metric.append(logs['mse_feat'].cpu().numpy())
+            logs['cos_feat'] = cosine_similarity.mean()
+            self.val_feat_cos_metric.append(logs['cos_feat'].cpu().numpy())
+
+        # # Print the results
+        # print("Cosine Similarity:", cosine_similarity)
+        # print("MSE Loss:", mse_loss.item())
+        # breakpoint()
 
         if not self.hparams.no_save_test: # save test image to disk
             idx = batch['img_idxs']
@@ -403,7 +476,7 @@ class NeRFSystem(LightningModule):
             depth = depth2img(rearrange(results['depth'].cpu().numpy(), '(h w) -> h w', h=h))
             imageio.imsave(os.path.join(self.val_dir, f'{idx:03d}.png'), rgb_pred)
             imageio.imsave(os.path.join(self.val_dir, f'{idx:03d}_d.png'), depth)
-
+            # breakpoint()
             # visualize PCA feature
             with torch.no_grad(), torch.autocast(device_type="cuda", dtype=torch.float32):
                 if not hasattr(self, 'proj_V'):
@@ -438,9 +511,16 @@ class NeRFSystem(LightningModule):
         if self.hparams.eval_lpips:
             val_lpips = np.mean(self.val_lpips_metric)
             self.log('val/lpips_vgg', val_lpips)
+        if len(self.val_feat_mse_metric):
+            val_feat_mse = np.mean(self.val_feat_mse_metric)
+            self.log('val/mse_feat', val_feat_mse)
+            val_feat_cos = np.mean(self.val_feat_cos_metric)
+            self.log('val/cos_feat', val_feat_cos)
         self.val_psnr_metric.clear()
         self.val_ssim_metric.clear()
         self.val_lpips_metric.clear()
+        self.val_feat_mse_metric.clear()
+        self.val_feat_cos_metric.clear()
 
 
     def get_progress_bar_dict(self):
