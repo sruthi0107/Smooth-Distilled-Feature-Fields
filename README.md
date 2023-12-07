@@ -17,12 +17,19 @@ Visualization of feature field before and after additional smoothening.
 Outputs from editing operations:
 
 
-<p float="left">
-  <img src="https://github.com/umangi-jain/smooth-dff/blob/sam_for_conv/demos/vegetable/pveg_sam.mp4" width="30%" />
-  <img src="https://github.com/umangi-jain/smooth-dff/blob/sam_for_conv/demos/vegetable/pveg_sam_color.mp4" width="30%" />
-  <img src="https://github.com/umangi-jain/smooth-dff/blob/sam_for_conv/demos/vegetable/video_sam.mp4" width="30%" />
-</p>
 
+
+
+
+https://github.com/umangi-jain/smooth-dff/assets/25801418/4f34eef7-09ad-41d6-86a8-450c9f1d255f
+
+
+
+https://github.com/umangi-jain/smooth-dff/assets/25801418/d091f6a6-4452-419d-ae79-b0ec081fd923
+
+
+
+https://github.com/umangi-jain/smooth-dff/assets/25801418/29e4bf97-6c36-416b-a4b7-7bdb9e2bc0fd
 
 
 
