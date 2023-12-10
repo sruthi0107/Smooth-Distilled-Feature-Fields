@@ -3,7 +3,7 @@
 Built on: [distilled feature fields (DFFs)](https://pfnet-research.github.io/distilled-feature-fields/) (Kobayashi et al. NeurIPS 2022).
 This is a simpler and faster demo codebase of [distilled feature fields (DFFs)](https://pfnet-research.github.io/distilled-feature-fields/) (Kobayashi et al. NeurIPS 2022).
 
-NOTES:
+### NOTES:
 1) For the 3 techniques that we tested in this project, we have 3 separate branches namely - total_variation, bilateral_filtering and sam_for_conv corresponding to total variation, bilateral filtering and the sam guided smoothing methods. The master branch contains the baseline code for DFFs
 2) Each of the three branches is structured similarly. The train.py file in each of these branches contains sections of code responsible for adding regularization (TV and Bilateral) and performing smoothing (SAM guided). These can be found within the training_step() function, specifically in the feature_loss section.
 
