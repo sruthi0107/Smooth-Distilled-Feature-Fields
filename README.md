@@ -1,4 +1,4 @@
-# Distilled Feature Fields
+# Smoothing in Distilled Feature Fields
 
 Built on: [distilled feature fields (DFFs)](https://pfnet-research.github.io/distilled-feature-fields/) (Kobayashi et al. NeurIPS 2022).
 This is a simpler and faster demo codebase of [distilled feature fields (DFFs)](https://pfnet-research.github.io/distilled-feature-fields/) (Kobayashi et al. NeurIPS 2022).
