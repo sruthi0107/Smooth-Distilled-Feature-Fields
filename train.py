@@ -332,64 +332,17 @@ class NeRFSystem(LightningModule):
 
         # feature loss
         if 'feature' in results and self.hparams.clipnerf_text is None:
-            # batch_size, feature_size
-            # random_number = np.random.rand()
-            # if random_number < 0.05:
-            #     save_pca_feature = False
-            #     pca_result_features = pca_do(torch.stack([results['feature'], batch['feature']], dim=0))
-            #     pca_result_features = (pca_result_features - pca_result_features.min()) / (pca_result_features.max() - pca_result_features.min())
-            #     pca_result_features = (pca_result_features*255).astype(np.uint8)
-            #     resf, batf = pca_result_features[0], pca_result_features[1]
-            #     imageio.imsave('rendered_feat_train_{}.png'.format(random_number), resf)
-            #     imageio.imsave('true_feat_train_{}.png'.format(random_number), batf)
-                # breakpoint()
-
-            # if 'sam_masks' in batch:
-            #     sam_masks = batch['sam_masks']
-            #     feats = results['feature'].reshape(PATCH_EMB, PATCH_EMB, -1)
-            #     for sam_mask in range(len(sam_masks)):
-            #         if sam_masks[sam_mask]["use"] and sam_masks[sam_mask]["area"] > 500:
-            #         # if sam_masks[sam_mask]["area"] > 500:
-            #         #     try:
-            #             random_number = np.random.rand()
-            #             seg = sam_masks[sam_mask]["segmentation"].reshape(PATCH_EMB, PATCH_EMB)#.unsqueeze(-1)
-            #             masks_feats = torch.zeros_like(feats)
-            #             for i in range(feats.shape[-1]):
-            #                 masks_feats[:, :, i] = seg
-            #             temp = feats * masks_feats
-            #             # breakpoint()
-            #             # feats = gblur(temp.permute(2, 0, 1), 3).permute(1, 2, 0)
-            #             feats = torch.where(masks_feats == 0, feats, gblur(temp.permute(2, 0, 1), 3).permute(1, 2, 0))
-
-            #             # breakpoint()
-            #             if random_number < 0.0005:
-            #                 import matplotlib.pyplot as plt
-            #                 sds = pca_do(feats.reshape(1, -1, 512))
-            #                 plt.imshow(sds[0])
-            #                 plt.savefig('blur_feat_before.png')
-            #                 sds = pca_do(feats.reshape(1, -1, 512))
-            #                 plt.imshow(sds[0])
-            #                 plt.savefig('blur_feat_after.png')
-            #                 plt.imshow(seg.cpu().numpy())
-            #                 plt.savefig('blur_seg.png')
-            #                 sds = pca_do(temp.reshape(1, -1, 512))
-            #                 # breakpoint()
-
-            #         # except:
-            #         #     print(seg.shape, 'seg shape')
-            # # breakpoint()
-            # # results['feature'] = feats.reshape(PATCH_EMB*PATCH_EMB, -1)
-            #     results['feature'] = feats.reshape(PATCH_EMB*PATCH_EMB, -1)
             loss_d['feature'] = ((results['feature'] - batch['feature']) ** 2).sum(-1).mean() * 1e-2
             
             self.log('train/loss_f', loss_d['feature'])
+
+            # Bilateral filtering as a regularizer
             filtered_features = results['feature'].clone()
             for feature_channel in range(results['feature'].shape[-1]):
                 feature_channel_img = results['feature'][:, feature_channel].reshape(PATCH_EMB, PATCH_EMB)
 
-                # Convert to numpy array
+                # Convert to numpy array and to the float 32 format for compatibility with cv2
                 feature_channel_np = feature_channel_img.detach().cpu().numpy()
-
                 feature_channel_np = feature_channel_np.astype(np.float32)
 
                 # Apply bilateral filter
@@ -400,11 +353,12 @@ class NeRFSystem(LightningModule):
                 # Reshape filtered channel back to the original shape
                 #filtered_channel = filtered_channel.view(-1, 1, 1)
 
-                M= filtered_features[:, feature_channel].shape
+                M = filtered_features[:, feature_channel].shape
+                
                 # Assign the filtered channel to the corresponding location in the tensor
                 filtered_features[:, feature_channel] = filtered_channel.reshape(M)
 
-            # Compute loss on the filtered features
+            # Compute weighted loss on the filtered features
             loss_d['feature_bilateral'] = ((filtered_features - batch['feature']) ** 2).sum(-1).mean() * 1e-2
 
         if self.hparams.use_exposure:
