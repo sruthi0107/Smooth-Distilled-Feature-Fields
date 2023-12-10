@@ -333,14 +333,15 @@ class NeRFSystem(LightningModule):
             #     imageio.imsave('rendered_feat_train_{}.png'.format(random_number), resf)
             #     imageio.imsave('true_feat_train_{}.png'.format(random_number), batf)
                 # breakpoint()
-
-            loss_d['feature'] = ((results['feature'] - batch['feature']) ** 2).sum(-1).mean() * 1e-2
+            
+            # Adding Total Variation as an explicit regularizer
+            loss_d['feature'] = ((results['feature'] - batch['feature']) ** 2).sum(-1).mean() * 1e-2    # Computing feature loss
             self.log('train/loss_f', loss_d['feature'])
             tv_loss = 0
             for feature_channel in range(results['feature'].shape[-1]):
                 grad_x, grad_y = grad_fn(results['feature'][:, feature_channel].reshape(PATCH_EMB, PATCH_EMB), self.dxyFT)
-                tv_loss += (torch.abs(grad_x) + torch.abs(grad_y)).mean()  * 1e-4
-            loss_d['feature_tv'] = tv_loss/results['feature'].shape[-1]
+                tv_loss += (torch.abs(grad_x) + torch.abs(grad_y)).mean()  * 1e-4                 # Computing TV loss
+            loss_d['feature_tv'] = tv_loss/results['feature'].shape[-1]      # Adding the weighted TV loss to the loss dictionary
 
         if self.hparams.use_exposure:
             zero_radiance = torch.zeros(1, 3, device=self.device)
@@ -350,7 +351,7 @@ class NeRFSystem(LightningModule):
                 0.5*(unit_exposure_rgb-self.train_dataset.unit_exposure_rgb)**2
         loss = sum(lo.mean() for lo in loss_d.values())
 
-        with torch.no_grad():
+        with torch.no_grad():  # Calculating metrics to display during training
             self.train_psnr(results['rgb'], batch['rgb'])
         self.log('lr', self.net_opt.param_groups[0]['lr'])
         self.log('train/loss', loss)
@@ -404,7 +405,7 @@ class NeRFSystem(LightningModule):
             imageio.imsave(os.path.join(self.val_dir, f'{idx:03d}.png'), rgb_pred)
             imageio.imsave(os.path.join(self.val_dir, f'{idx:03d}_d.png'), depth)
 
-            # visualize PCA feature
+            # visualize PCA feature - feature maps
             with torch.no_grad(), torch.autocast(device_type="cuda", dtype=torch.float32):
                 if not hasattr(self, 'proj_V'):
                     U, S, V = torch.pca_lowrank(
