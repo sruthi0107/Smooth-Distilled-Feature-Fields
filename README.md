@@ -1,7 +1,9 @@
 # Smoothing in Distilled Feature Fields
 
+## Abstract
+Neural radiance fields (NeRFs) are a popular approach for rendering novel views and have been extended to a wide range of tasks such as editing, segmentation, and language-driven applications. Feature field distillation is a technique that facilitates editing and zero-shot segmentation by utilizing knowledge from large-scale 2D extractors such as CLIP and LSeg to learn a 3D feature field that is optimized in parallel to the radiance field. However, naive distillation can contain unwanted high-frequency artifacts, hampering fine-grained control and resulting in imprecise scene decomposition. In our work, we address this challenge by generating smoother Distilled Feature Fields (DFF) through the incorporation of explicit regularizers and off-the-shelf segmentation masks. Subsequently, we assess the effectiveness of these smoothened features through scene editing.
+
 Built on: [distilled feature fields (DFFs)](https://pfnet-research.github.io/distilled-feature-fields/) (Kobayashi et al. NeurIPS 2022).
-This is a simpler and faster demo codebase of [distilled feature fields (DFFs)](https://pfnet-research.github.io/distilled-feature-fields/) (Kobayashi et al. NeurIPS 2022).
 
 ### NOTES:
 1) For the 3 techniques that we tested in this project, we have 3 separate branches namely - total_variation, bilateral_filtering and sam_for_conv corresponding to total variation, bilateral filtering and the sam guided smoothing methods. The master branch contains the baseline code for DFFs
